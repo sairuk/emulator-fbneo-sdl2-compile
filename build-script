@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# Build FBNeo emulator either normal or debug built
+# specific target commit has hash as $1 nothing 
+# special here.
+# 
+# Set env 
+# RELEASE to compile normal/debug
+# COMMIT commit hash to checkout
+#
+# @@Author: sairuk
+
+GITREPO=https://github.com/finalburnneo/FBNeo.git
+REPODIR=FBNeo
+CC=$(($(grep vendor_id /proc/cpuinfo | wc -l)-1))
+
+cd $HOME
+
+# eat fresh
+[ "${PWD}" == "${HOME}"] && rm -Rf ./${REPODIR}/
+
+if [ ! -d ${HOME}/${REPODIR}/.git ]; then
+    git clone --recurse-submodules $GITREPO
+fi
+
+#
+# Update Repo
+#
+cd ${HOME}/${REPODIR}
+
+# force reset local tree
+# checkout target commit
+git checkout ${COMMIT}
+
+#
+# Clean
+#
+[ -f ./fbneo ] && rm ./fbneo
+[ -d ./obj ] && rm -R ./obj/
+
+
+#
+# Compile
+#
+if [ $RELEASE -eq 1 ]
+then
+  make sdl2 RELEASEBUILD=1 FORCE_UPDATE=1
+else
+  make sdl2 FORCE_UPDATE=1 -j $CC
+fi
+

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+
+COMMIT=${1:-master}
+BASEDIR=${2:-$(pwd)}
+CONTAINER=$(basename $BASEDIR)
+DOCKEROUT=${HOME}/dockerout/fbneo/debug
+
+[ ! -d ${DOCKEROUT} ] && mkdir -p ${DOCKEROUT}
+
+docker stop $CONTAINER
+docker rm $CONTAINER
+
+# launch new
+docker run -d \
+--volume ${DOCKEROUT}:/home/emudev \
+--name $CONTAINER \
+-e RELEASE=0 \
+-e COMMIT=${COMMIT} \
+$CONTAINER:latest
+
+docker logs --follow $CONTAINER
+

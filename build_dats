@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# Compile both versions then build delta and diff data for each
+#
+# @@Author: sairuk
+
+#set -x
+
+DATDIFF=${HOME}/devel/datdiff/
+DATOUT=${HOME}/.local/share/fbneo/dats
+COMMIT=${1:-master}
+MVER=${2:-222}
+COMTSHRT=$(echo $COMMIT | cut -b-9)
+OUTDIR=${DATDIFF}/out/deltas
+
+
+# run normal
+${HOME}/devel/docker/emulator-fbneo/run_container ${COMMIT}
+
+# pack normal
+DOCKEROUT=${HOME}/dockerout/fbneo/normal/FBNeo
+DATDEST=${HOME}/devel/datdiff/dats/fbneo/normal
+${DOCKEROUT}/fbneo -dat
+rm -f ${DATDEST}/*.dat
+cp ${DATOUT}/*.dat ${DATDEST}/
+
+
+# run debug
+${HOME}/devel/docker/emulator-fbneo/run_container_debug ${COMMIT}
+
+# pack debug
+DOCKEROUT=${HOME}/dockerout/fbneo/debug/FBNeo
+DATDEST=${HOME}/devel/datdiff/dats/fbneo/debug
+${DOCKEROUT}/fbneo -dat
+rm -f ${DATDEST}/*.dat
+cp ${DATOUT}/*.dat ${DATDEST}/
+
+
+# this next section needs the diff tool, its not released yet so we'll exit if
+# we can't find it
+
+[ ! -f "${DATDIFF}/diff-dat_alt.py" ] && exit
+
+IFS=$'\n'
+cd "${DATDIFF}"
+rm ${OUTDIR}/*.dat
+
+function build_delta {
+ ./diff-dat_alt.py \
+  --supplement "dats/fbneo/debug/$1" \
+  --parent "dats/fbneo/normal/$1" \
+  --append-version "_git($COMTSHRT) [DELTA]" \
+  --append-name "_git($COMTSHRT) [DELTA]" \
+  --output "{$OUTDIR}" \
+  --force
+}
+
+
+# at this point it doesn't matter which base dir we choose
+# this is just hacky for my crap
+
+for DAT in $(ls ${DATDEST})
+do 
+    build_delta "${DAT}"
+done
+
+
