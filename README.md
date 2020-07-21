@@ -11,7 +11,7 @@ Compile the FBNeo emulator (SDL2 version) within docker, uses a ubuntu base imag
 FBANeo will be compiled to <host path>
 
 ### Build dats
-``` ./build_dats ``` will compile run the emulator dump the dats. this only 
+``` ./build_dats ``` will compile and run the emulator,  dump the dats. this only 
 exists for me to build diff/delta dats for the emu without having to do much 
 work but you're welcome to tweak it. The diffing tool is unreleased atm.
 

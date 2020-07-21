@@ -44,7 +44,7 @@ git checkout ${COMMIT}
 #
 if [ $RELEASE -eq 1 ]
 then
-  make sdl2 RELEASEBUILD=1 FORCE_UPDATE=1
+  make sdl2 RELEASEBUILD=1 FORCE_UPDATE=1 -j $CC
 else
   make sdl2 FORCE_UPDATE=1 -j $CC
 fi
