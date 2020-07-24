@@ -10,6 +10,8 @@
 #
 # @@Author: sairuk
 
+set -u
+
 GITREPO=https://github.com/finalburnneo/FBNeo.git
 REPODIR=FBNeo
 CC=$(($(grep vendor_id /proc/cpuinfo | wc -l)-1))
@@ -17,7 +19,7 @@ CC=$(($(grep vendor_id /proc/cpuinfo | wc -l)-1))
 cd $HOME
 
 # eat fresh
-[ "${PWD}" == "${HOME}"] && rm -Rf ./${REPODIR}/
+[ "${PWD}" == "${HOME}" ] && rm -Rf ./${REPODIR}/
 
 if [ ! -d ${HOME}/${REPODIR}/.git ]; then
     git clone --recurse-submodules $GITREPO
@@ -44,8 +46,8 @@ git checkout ${COMMIT}
 #
 if [ $RELEASE -eq 1 ]
 then
-  make sdl2 RELEASEBUILD=1 FORCE_UPDATE=1 -j $CC
+  make sdl2 RELEASEBUILD=1 FORCE_UPDATE=1
 else
-  make sdl2 FORCE_UPDATE=1 -j $CC
+  make sdl2 FORCE_UPDATE=1
 fi
 

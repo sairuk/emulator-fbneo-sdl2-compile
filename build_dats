@@ -9,31 +9,116 @@
 DATDIFF=${HOME}/devel/datdiff/
 DATOUT=${HOME}/.local/share/fbneo/dats
 COMMIT=${1:-master}
-MVER=${2:-222}
 COMTSHRT=$(echo $COMMIT | cut -b-9)
-OUTDIR=${DATDIFF}out/deltas
+COMPILE=0
+RUNDATE=$(date +'%Y-%m-%d_%H-%M-%S')
+LOGDIR="${HOME}/logs/$(basename $0)/"
+LOGFILE="${LOGDIR}/$(basename $0)-${RUNDATE}.log"
 
+function _log {
+  [ ! -d ${LOGDIR} ] && mkdir -p ${LOGDIR}
 
-# run normal
-#${HOME}/devel/docker/emulator-fbneo/run_container ${COMMIT}
+  local TEEARGS=""
+  local SECT=$2
+  local MSG="$1"
+  if [ ! -z "${SECT}" ] 
+  then
+    TEEARGS="-a"
+  else
+    SECT="${1}"
+  fi
 
-# pack normal
-DOCKEROUT=${HOME}/dockerout/fbneo/normal/FBNeo
-DATDEST=${HOME}/devel/datdiff/dats/fbneo/normal
-${DOCKEROUT}/fbneo -dat
-rm -f ${DATDEST}/*.dat
-cp ${DATOUT}/*.dat ${DATDEST}/
+  echo "[$(date +'%Y-%m-%d')] ${SECT}|: ${MSG}" | tee ${TEEARGS} ${LOGFILE}
+}
 
+function header {
+_log "### $1: any output will be in ${LOGFILE} ###" "RUN"
+}
 
-# run debug
-#${HOME}/devel/docker/emulator-fbneo/run_container_debug ${COMMIT}
+function compile {
+  local SECT="COMPILE"
+  if [ $COMPILE -eq 1 ]
+  then
+    _log "Running container for $1, building ${COMMIT}" ${SECT}
+    ${HOME}/devel/docker/emulator-fbneo/run_container_$1 ${COMMIT}
+    #[ ! $? -eq 0 ] && _log "Compile failed for $1 check ${LOGFILE} for details" ${SECT} && exit 1
+  fi
+}
 
-# pack debug
-DOCKEROUT=${HOME}/dockerout/fbneo/debug/FBNeo
-DATDEST=${HOME}/devel/datdiff/dats/fbneo/debug
-${DOCKEROUT}/fbneo -dat
-rm -f ${DATDEST}/*.dat
-cp ${DATOUT}/*.dat ${DATDEST}/
+function gendats {
+  local DOCKEROUT="${HOME}/dockerout/fbneo/$1/FBNeo"
+  local DATDEST="${HOME}/devel/datdiff/dats/fbneo/$1"
+  local SECT="DATS"
+
+  [ ! -f ${DOCKEROUT}/fbneo ] && _log "fbneo not found, $1 build failed ... exiting" CHECK && exit 1
+
+  _log "Blindly removing old dats from ${DATDEST}" ${SECT}
+  rm -fvv ${DATDEST}/*.dat >> ${LOGFILE}
+
+  ${DOCKEROUT}/fbneo -dat >> ${LOGFILE}
+
+  _log "Copying new dats from ${DATOUT} to ${DATDEST}" ${SECT}
+  cp -vvv ${DATOUT}/*.dat ${DATDEST}/ >> ${LOGFILE}
+
+  _log "Removing old dats from ${DATOUT}" ${SECT}
+  rm -fvv ${DATOUT}/*.dat >> ${LOGFILE}
+}
+
+function monitor {
+  # check in to see if compiles are complete
+  local NORMAL="unknown"
+  local DEBUG="unknown"
+
+  SECT="MONITOR"
+  STATE='"exited"'
+  CHKINT=15
+  CHKPTS=60
+  CHKIDX=0
+
+  if [ $COMPILE -eq 1 ]
+  # give docker a chance to bring the containers up
+  sleep 5
+  _log "This is the monitor, it'll check the containers every ${CHKINT}s for ${CHKPTS} tries" "MONTIOR"
+  then
+    while [ ${CHKIDX} -le $CHKPTS ]
+    do
+        _log "Checking containers" "MONITOR"
+        NORMAL=$(docker inspect emulator-fbneo-normal | jq '.[0].State.Status')
+        DEBUG=$(docker inspect emulator-fbneo-debug | jq '.[0].State.Status')
+        # do the containers exist?
+        if [ $NORMAL != '"null"' ] || [ $DEBUG != '"null"' ]
+        then
+        _log "State normal ${NORMAL}" "MONITOR"
+        _log "State debug ${DEBUG}" "MONITOR"
+        if [ $NORMAL != ${STATE} ] || [ $DEBUG != ${STATE} ]
+        then
+          _log "Containera still not in ${STATE} state, sleeping for ${CHKINT}s" "MONITOR"
+          sleep ${CHKINT}
+        else
+          break
+        fi
+      fi
+    done
+  fi
+}
+
+function run {
+  _log "NEW RUN"
+
+  header normal
+  compile normal
+
+  header debug
+  compile debug
+
+  monitor
+
+  gendats normal
+  gendats debug
+
+}
+
+run 
 
 
 # this next section needs the diff tool, its not released yet so we'll exit if
@@ -41,27 +126,20 @@ cp ${DATOUT}/*.dat ${DATDEST}/
 
 [ ! -f "${DATDIFF}/diff-dat_alt.py" ] && exit
 
-IFS=$'\n'
-cd "${DATDIFF}"
-rm ${OUTDIR}/*.dat
+SECT="DIFF"
+header "diffs"
 
-function build_delta {
- ./diff-dat_alt.py \
-  --supplement "dats/fbneo/debug/$1" \
-  --parent "dats/fbneo/normal/$1" \
-  --append-version "_git($COMTSHRT) [DELTA]" \
-  --append-name "_git($COMTSHRT) [DELTA]" \
-  --output "${OUTDIR}" \
-  --force
-}
+cd ${DATDIFF}
 
+# deltas
+_log "Building delta set for ${COMMIT}" ${SECT}
+./run_FBNEO_delta ${COMTSHRT} &>> ${LOGFILE}
 
-# at this point it doesn't matter which base dir we choose
-# this is just hacky for my crap
+# mame diffs
+_log "Building MAME diff set for ${COMMIT}, MAME version is handled in the diff script not here" ${SECT}
+./run_FBNEO_mame-diff ${COMTSHRT} &>> ${LOGFILE}
 
-for DAT in $(ls ${DATDEST})
-do 
-    build_delta "${DAT}"
-done
-
+# packerman!
+_log "Packing the new data from ${COMMIT}" ${SECT}
+./pack_dats ${COMTSHRT} &>> ${LOGFILE}
 

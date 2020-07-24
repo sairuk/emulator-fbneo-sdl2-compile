@@ -1,22 +1,22 @@
 #!/bin/bash
 
-
 COMMIT=${1:-master}
 BASEDIR=${2:-$(pwd)}
 CONTAINER=$(basename $BASEDIR)
-DOCKEROUT=${HOME}/dockerout/fbneo/normal
+CONTTYPE=normal
+DOCKEROUT=${HOME}/dockerout/fbneo/${CONTTYPE}
 
 [ ! -d ${DOCKEROUT} ] && mkdir -p ${DOCKEROUT}
 
-docker stop $CONTAINER
-docker rm $CONTAINER
+docker stop $CONTAINER-${CONTTYPE}
+docker rm $CONTAINER-${CONTTYPE}
 
 # launch new
 docker run -d \
 --volume ${DOCKEROUT}:/home/emudev \
---name $CONTAINER \
+--name ${CONTAINER}-${CONTTYPE} \
 -e RELEASE=1 \
 -e COMMIT=${COMMIT} \
 $CONTAINER:latest
 
-docker logs --follow $CONTAINER
+#docker logs --follow ${CONTAINER}-${CONTTYPE}
