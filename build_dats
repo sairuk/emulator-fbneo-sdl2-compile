@@ -10,7 +10,7 @@ DATDIFF=${HOME}/devel/datdiff/
 DATOUT=${HOME}/.local/share/fbneo/dats
 COMMIT=${1:-master}
 COMTSHRT=$(echo $COMMIT | cut -b-9)
-COMPILE=0
+COMPILE=1
 RUNDATE=$(date +'%Y-%m-%d_%H-%M-%S')
 LOGDIR="${HOME}/logs/$(basename $0)/"
 LOGFILE="${LOGDIR}/$(basename $0)-${RUNDATE}.log"
@@ -28,7 +28,7 @@ function _log {
     SECT="${1}"
   fi
 
-  echo "[$(date +'%Y-%m-%d')] ${SECT}|: ${MSG}" | tee ${TEEARGS} ${LOGFILE}
+  echo "[$(date +'%Y-%m-%d %H-%M-%S')] ${SECT}|: ${MSG}" | tee ${TEEARGS} ${LOGFILE}
 }
 
 function header {
@@ -40,8 +40,10 @@ function compile {
   if [ $COMPILE -eq 1 ]
   then
     _log "Running container for $1, building ${COMMIT}" ${SECT}
-    ${HOME}/devel/docker/emulator-fbneo/run_container_$1 ${COMMIT}
+    ${HOME}/devel/docker/emulator-fbneo/run_container_$1 ${COMMIT} >> ${LOGFILE}
     #[ ! $? -eq 0 ] && _log "Compile failed for $1 check ${LOGFILE} for details" ${SECT} && exit 1
+  else
+    _log "Compile was not armed for this run of $1"
   fi
 }
 
@@ -73,16 +75,16 @@ function monitor {
   STATE='"exited"'
   CHKINT=15
   CHKPTS=60
-  CHKIDX=0
+  CHKIDX=1
 
   if [ $COMPILE -eq 1 ]
-  # give docker a chance to bring the containers up
-  sleep 5
+  _log "sleeping for ${CHKINT}s to give docker a chance to bring the containers up" "COMPILE"
+  sleep ${CHKINT}
   _log "This is the monitor, it'll check the containers every ${CHKINT}s for ${CHKPTS} tries" "MONTIOR"
   then
     while [ ${CHKIDX} -le $CHKPTS ]
     do
-        _log "Checking containers" "MONITOR"
+        _log "Try ${CHKIDX}/${CHKPTS} Checking containers" "MONITOR"
         NORMAL=$(docker inspect emulator-fbneo-normal | jq '.[0].State.Status')
         DEBUG=$(docker inspect emulator-fbneo-debug | jq '.[0].State.Status')
         # do the containers exist?
@@ -92,7 +94,8 @@ function monitor {
         _log "State debug ${DEBUG}" "MONITOR"
         if [ $NORMAL != ${STATE} ] || [ $DEBUG != ${STATE} ]
         then
-          _log "Containera still not in ${STATE} state, sleeping for ${CHKINT}s" "MONITOR"
+          _log "Container still not in ${STATE} state, sleeping for ${CHKINT}s" "MONITOR"
+          CHKIDX=$((${CHKIDX}+1))
           sleep ${CHKINT}
         else
           break
